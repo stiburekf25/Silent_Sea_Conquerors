@@ -16,6 +16,8 @@ pozice_lode_x = OKNO_sirka / 2 - velikost_lode_x / 2
 pozice_lode_y = OKNO_vyska / 2 - velikost_lode_y / 2
 
 clock = pygame.time.Clock()
+stisknuto = pygame.key.get_pressed()
+mys_pozice = pygame.mouse.get_pos()
 
 while hra:
     for udalost in pygame.event.get():
