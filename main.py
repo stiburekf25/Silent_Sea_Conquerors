@@ -2,7 +2,7 @@ import pygame
 pygame.init()
 import sys
 
-OKNO_sirka, OKNO_vyska = 1280, 900
+OKNO_sirka, OKNO_vyska = 1280, 768
 okno = pygame.display.set_mode((OKNO_sirka, OKNO_vyska))
 fullscreen = False
 
