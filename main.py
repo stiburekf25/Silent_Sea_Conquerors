@@ -24,6 +24,8 @@ aktualni_rychlost_lode = 2
 mapa_neotevrena_puvodni = pygame.image.load("mapa_puvodni_neotevrena.png")
 mapa_otevrena_puvodni = pygame.image.load("mapa_puvodni_otevrena.png")
 mapa_exit = pygame.image.load("exit_mapa.png")
+mapa_background = pygame.image.load("mapa_background.png")
+kompas_obrazek = pygame.image.load("compas.png")
 
 #recty
 mapa_neotevrena_puvodni_rect = mapa_neotevrena_puvodni.get_rect(topleft=(OKNO_sirka - 150, 30))
@@ -78,8 +80,10 @@ while hra:
         okno.blit(mapa_neotevrena_puvodni, (OKNO_sirka - 150, 30))
     if mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
         okno.blit(mapa_otevrena_puvodni, (OKNO_sirka - 150, 30))
+    if not mapa_otevrena:
+        okno.blit(kompas_obrazek, (50, 50))
     if mapa_otevrena:
-        pygame.draw.rect(okno, (0, 255, 0), (50, 50, 1180, 668))
+        okno.blit(mapa_background, (50, 50))
         okno.blit(mapa_exit, (OKNO_sirka - 120, 630))
 
     pygame.display.flip()
