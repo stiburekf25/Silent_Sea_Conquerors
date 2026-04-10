@@ -14,11 +14,15 @@ mapa_otevrena = False
 #Barvy
 cervena = 200, 200, 200
 
+# Velikost světa.
+MAPA_SIRKA = 5000
+MAPA_VYSKA = 5000
+
 # Vlastnosti lode
 velikost_lode_x = 100
 velikost_lode_y = 200
-pozice_lode_x = OKNO_sirka / 2 - velikost_lode_x / 2
-pozice_lode_y = OKNO_vyska / 2 - velikost_lode_y / 2
+pozice_lode_x = MAPA_SIRKA / 2 - velikost_lode_x / 2
+pozice_lode_y = MAPA_VYSKA / 2 - velikost_lode_y / 2
 aktualni_rychlost_lode = 2
 
 #Obrazky
@@ -27,10 +31,11 @@ mapa_otevrena_puvodni = pygame.image.load("mapa_puvodni_otevrena.png")
 mapa_exit = pygame.image.load("exit_mapa.png")
 mapa_background = pygame.image.load("mapa_background.png")
 kompas_obrazek = pygame.image.load("compas.png")
+mapa_exit_vetsi = pygame.transform.scale(mapa_exit, (mapa_exit.get_width() * 1.2, mapa_exit.get_height() * 1.2))
 
 #recty
 mapa_neotevrena_puvodni_rect = mapa_neotevrena_puvodni.get_rect(topleft=(OKNO_sirka - 150, 30))
-mapa_exit_rect = mapa_exit.get_rect(topleft=(OKNO_sirka - 120, 630))
+mapa_exit_rect = mapa_exit.get_rect(topleft=(OKNO_sirka - 180, 630))
 kompas_rect = kompas_obrazek.get_rect(topleft=(15, 5))
 
 # Směr ručičky kompasu: 0 = sever, 90 = východ, 180 = jih, 270 = západ.
@@ -61,6 +66,10 @@ while hra:
     if stisknuto[pygame.K_d]:
         pozice_lode_x += aktualni_rychlost_lode
 
+    # Kamera drží loď uprostřed okna.
+    kamera_x = pozice_lode_x + velikost_lode_x / 2 - OKNO_sirka / 2
+    kamera_y = pozice_lode_y + velikost_lode_y / 2 - OKNO_vyska / 2
+
     smer_x = int(stisknuto[pygame.K_d]) - int(stisknuto[pygame.K_a])
     smer_y = int(stisknuto[pygame.K_s]) - int(stisknuto[pygame.K_w])
 
@@ -87,8 +96,14 @@ while hra:
     if mapa_exit_rect.collidepoint(mys_pozice) and mouse_click and mapa_otevrena:
         mapa_otevrena = False
 
-    okno.fill((20, 89, 163))
-    pygame.draw.rect(okno, cervena, (pozice_lode_x, pozice_lode_y, velikost_lode_x, velikost_lode_y))
+    okno.fill((13, 55, 102))
+
+    # Vykreslení mapy posunuté kamerou.
+    pygame.draw.rect(okno, (20, 89, 163), (-kamera_x, -kamera_y, MAPA_SIRKA, MAPA_VYSKA))
+
+    lod_na_obrazovce_x = pozice_lode_x - kamera_x
+    lod_na_obrazovce_y = pozice_lode_y - kamera_y
+    pygame.draw.rect(okno, cervena, (lod_na_obrazovce_x, lod_na_obrazovce_y, velikost_lode_x, velikost_lode_y))
     if not mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
         okno.blit(mapa_neotevrena_puvodni, (OKNO_sirka - 150, 30))
     if mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
@@ -108,7 +123,9 @@ while hra:
         pygame.draw.circle(okno, (30, 30, 30), (stred_x, stred_y), 6)
     if mapa_otevrena:
         okno.blit(mapa_background, (50, 50))
-        okno.blit(mapa_exit, (OKNO_sirka - 120, 630))
+        okno.blit(mapa_exit, (OKNO_sirka - 180, 630))
+        if mapa_exit_rect.collidepoint(mys_pozice):
+            okno.blit(mapa_exit_vetsi, (OKNO_sirka - 185, 625))
 
     pygame.display.flip()
     clock.tick(60)
