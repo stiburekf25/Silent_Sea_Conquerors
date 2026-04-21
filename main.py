@@ -41,6 +41,7 @@ kotva_obrazek = pygame.image.load("kotva.png")
 kotva_vetsi = pygame.transform.scale(kotva_obrazek, (kotva_obrazek.get_width() * 1.1, kotva_obrazek.get_height() * 1.1))
 kotva_dole = pygame.image.load("kotva_dole.png")
 kotva_dole_vetsi = pygame.transform.scale(kotva_dole, (kotva_dole.get_width() * 1.1, kotva_dole.get_height() * 1.1))
+ostorv1 = pygame.image.load("lavovy_ostrov.png")
 
 #recty
 mapa_neotevrena_puvodni_rect = mapa_neotevrena_puvodni.get_rect(topleft=(OKNO_sirka - 150, 30))
