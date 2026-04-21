@@ -32,6 +32,7 @@ mapa_exit = pygame.image.load("exit_mapa.png")
 mapa_background = pygame.image.load("mapa_background.png")
 kompas_obrazek = pygame.image.load("compas.png")
 mapa_exit_vetsi = pygame.transform.scale(mapa_exit, (mapa_exit.get_width() * 1.2, mapa_exit.get_height() * 1.2))
+ostorv1 = pygame.image.load("lavovy_ostrov.png")
 
 #recty
 mapa_neotevrena_puvodni_rect = mapa_neotevrena_puvodni.get_rect(topleft=(OKNO_sirka - 150, 30))
