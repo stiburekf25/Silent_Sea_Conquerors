@@ -139,15 +139,22 @@ while hra:
     okno.fill((13, 55, 102))
 
     # Jemná textura moře z kroutících se čar
-    for y in range(-30, OKNO_vyska + 30, 22):
+    for radek_index, y in enumerate(range(-30, OKNO_vyska + 30, 22)):
         start_x = -60
+        faze_radku = radek_index * 0.45 + cas_animace * 0.12
         while start_x < OKNO_sirka + 60:
+            strida = (int(start_x / 40) + radek_index) % 2
+            if strida == 0:
+                delka = 16 + int((math.sin(start_x * 0.03 + y * 0.02 + faze_radku) + 1) * 5)
+            else:
+                delka = 28 + int((math.sin(start_x * 0.03 + y * 0.02 + faze_radku) + 1) * 9)
+
             x1 = int(start_x)
-            x2 = int(start_x + 26)
-            y1 = int(y + math.sin((start_x * 0.018 + y * 0.01 + cas_animace * 0.25)) * 6)
-            y2 = int(y + math.sin(((start_x + 26) * 0.018 + y * 0.01 + cas_animace * 0.25)) * 6)
+            x2 = int(start_x + delka)
+            y1 = int(y + math.sin((start_x * 0.018 + y * 0.01 + cas_animace * 0.25 + radek_index * 0.2)) * 6)
+            y2 = int(y + math.sin(((start_x + delka) * 0.018 + y * 0.01 + cas_animace * 0.25 + radek_index * 0.2)) * 6)
             pygame.draw.line(okno, (26, 86, 138), (x1, y1), (x2, y2), 2)
-            start_x += 40
+            start_x += 42 if strida == 0 else 48
 
     lod_stred_x = pozice_lode_x + velikost_lode_x / 2 - kamera_x
     lod_stred_y = pozice_lode_y + velikost_lode_y / 2 - kamera_y
