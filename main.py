@@ -28,7 +28,7 @@ aktualni_rychlost_lode = 2
 pomala_rychlost_lode = 1
 cas_pomale_jizdy_ms = 5000
 cas_vytazeni_kotvy = pygame.time.get_ticks()
-rychlost_otaceni = 2
+rychlost_otaceni_basic = 2
 
 #Obrazky
 mapa_neotevrena_puvodni = pygame.image.load("mapa_puvodni_neotevrena.png")
@@ -42,6 +42,7 @@ kotva_vetsi = pygame.transform.scale(kotva_obrazek, (kotva_obrazek.get_width() *
 kotva_dole = pygame.image.load("kotva_dole.png")
 kotva_dole_vetsi = pygame.transform.scale(kotva_dole, (kotva_dole.get_width() * 1.1, kotva_dole.get_height() * 1.1))
 ostorv1 = pygame.image.load("lavovy_ostrov.png")
+basic_lod = pygame.image.load("basic_lod.png")
 
 #recty
 mapa_neotevrena_puvodni_rect = mapa_neotevrena_puvodni.get_rect(topleft=(OKNO_sirka - 150, 30))
@@ -53,13 +54,16 @@ kotva_dole_rect = kotva_dole.get_rect(topleft=(OKNO_sirka - 140, 610))
 #fonty
 font = pygame.font.SysFont("Arial", 24)
 
-# Loď vykreslujeme přes surface, aby šla otáčet podle směru.
-lod_surface = pygame.Surface((velikost_lode_x, velikost_lode_y), pygame.SRCALPHA)
-pygame.draw.rect(lod_surface, cervena, (0, 0, velikost_lode_x, velikost_lode_y))
+# Loď se otáčí podle směru.
+lod_surface = basic_lod
 
 # Směr ručičky kompasu: 0 = sever, 90 = východ, 180 = jih, 270 = západ.
 uhel_kompasu = 0
 kompas_rucicka_offset_y = 20
+
+# Animace moře
+cas_animace = 0
+rychlost_vln = 0.01  # Velmi pomalý pohyb vln
 
 clock = pygame.time.Clock()
 
@@ -87,9 +91,9 @@ while hra:
     
     if kotva:
         if stisknuto[pygame.K_a]:
-            uhel_kompasu -= rychlost_otaceni
+            uhel_kompasu -= rychlost_otaceni_basic
         if stisknuto[pygame.K_d]:
-            uhel_kompasu += rychlost_otaceni
+            uhel_kompasu += rychlost_otaceni_basic
 
     uhel_kompasu %= 360
 
@@ -101,8 +105,8 @@ while hra:
     kamera_x = pozice_lode_x + velikost_lode_x / 2 - OKNO_sirka / 2
     kamera_y = pozice_lode_y + velikost_lode_y / 2 - OKNO_vyska / 2
 
-    # Kompas ukazuje aktuální směr lodi, který měníš zatáčením.
-    
+    # Aktualizace animace
+    cas_animace += rychlost_vln
     
     
 #Cursor
@@ -134,14 +138,23 @@ while hra:
         kotva = False
     okno.fill((13, 55, 102))
 
-    # Vykreslení mapy posunuté kamerou.
-    pygame.draw.rect(okno, (20, 89, 163), (-kamera_x, -kamera_y, MAPA_SIRKA, MAPA_VYSKA))
+    # Jemná textura moře z kroutících se čar
+    for y in range(-30, OKNO_vyska + 30, 22):
+        start_x = -60
+        while start_x < OKNO_sirka + 60:
+            x1 = int(start_x)
+            x2 = int(start_x + 26)
+            y1 = int(y + math.sin((start_x * 0.018 + y * 0.01 + cas_animace * 0.25)) * 6)
+            y2 = int(y + math.sin(((start_x + 26) * 0.018 + y * 0.01 + cas_animace * 0.25)) * 6)
+            pygame.draw.line(okno, (26, 86, 138), (x1, y1), (x2, y2), 2)
+            start_x += 40
 
     lod_stred_x = pozice_lode_x + velikost_lode_x / 2 - kamera_x
     lod_stred_y = pozice_lode_y + velikost_lode_y / 2 - kamera_y
     otocena_lod = pygame.transform.rotate(lod_surface, -uhel_kompasu)
     otocena_lod_rect = otocena_lod.get_rect(center=(lod_stred_x, lod_stred_y))
     okno.blit(otocena_lod, otocena_lod_rect)
+
     if not mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
         okno.blit(mapa_neotevrena_puvodni, (OKNO_sirka - 150, 30))
     if mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
