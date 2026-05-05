@@ -41,7 +41,6 @@ kotva_obrazek = pygame.image.load("kotva.png")
 kotva_vetsi = pygame.transform.scale(kotva_obrazek, (kotva_obrazek.get_width() * 1.1, kotva_obrazek.get_height() * 1.1))
 kotva_dole = pygame.image.load("kotva_dole.png")
 kotva_dole_vetsi = pygame.transform.scale(kotva_dole, (kotva_dole.get_width() * 1.1, kotva_dole.get_height() * 1.1))
-ostorv1 = pygame.image.load("lavovy_ostrov.png")
 basic_lod = pygame.image.load("basic_lod.png")
 
 #recty
@@ -66,6 +65,40 @@ cas_animace = 0
 rychlost_vln = 0.01  # Velmi pomalý pohyb vln
 
 clock = pygame.time.Clock()
+
+
+#ostrovy
+
+rozestup_ostrovu = 2000
+
+ostrov_spawn = [
+    {"x": 700, "y": 700, "nazev": "lava_ostrov"},
+    {"x": -2500, "y": -1500, "nazev": "shop_ostrov"},
+    {"x": -4000, "y": -3000, "nazev": "lava_ostrov"},
+]
+
+
+vyber_ostrovu = [
+    {
+        "nazev": "lava_ostrov",
+        "obrazek": pygame.image.load("lava_ostrov.png"),
+    },
+    {
+        "nazev": "shop_ostrov",
+        "obrazek": pygame.image.load("shop_ostrov.png"),
+    }
+]
+
+#recty ostrovů
+
+
+
+
+
+
+
+
+
 
 while hra:
     mouse_click = False
@@ -162,6 +195,45 @@ while hra:
     otocena_lod = pygame.transform.rotate(lod_surface, -uhel_kompasu)
     otocena_lod_rect = otocena_lod.get_rect(center=(lod_stred_x, lod_stred_y))
     okno.blit(otocena_lod, otocena_lod_rect)
+
+    for ostrov in ostrov_spawn:
+        nazev = ostrov["nazev"]
+        data_ostrovu = next((o for o in vyber_ostrovu if o["nazev"] == nazev), None)
+        if data_ostrovu:
+            obrazek_ostrovu = data_ostrovu["obrazek"]
+            pozice_x = ostrov["x"] - kamera_x - obrazek_ostrovu.get_width() / 2
+            pozice_y = ostrov["y"] - kamera_y - obrazek_ostrovu.get_height() / 2
+            
+            # Střed ostrova na obrazovce
+            stred_x = int(ostrov["x"] - kamera_x)
+            stred_y = int(ostrov["y"] - kamera_y)
+            
+            # Elipsa kolem ostrova
+            sirka_elipsy = 800
+            vyska_elipsy = 800
+            
+            # Detekce kolize - vzdálenost mezi lodí a ostrovem
+            dx = ostrov["x"] - (pozice_lode_x + velikost_lode_x / 2)
+            dy = ostrov["y"] - (pozice_lode_y + velikost_lode_y / 2)
+            vzdalenost = math.hypot(dx, dy)
+            
+            # Poloměr kolize (průměr elipsy)
+            polomer_kolize = (sirka_elipsy + vyska_elipsy) / 4
+            
+            # Změní se barva elipsy podle kolize
+            if vzdalenost < polomer_kolize + 50:
+                barva_elipsy = (255, 0, 0)  # Červená když je blízko
+            else:
+                barva_elipsy = (100, 150, 200)  # Modrá normálně
+            
+            pygame.draw.ellipse(okno, barva_elipsy, (stred_x - sirka_elipsy // 2, stred_y - vyska_elipsy // 2, sirka_elipsy, vyska_elipsy), 2)
+            
+            # Obrázek ostrova
+            okno.blit(obrazek_ostrovu, (pozice_x, pozice_y))
+
+
+
+
 
     if not mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
         okno.blit(mapa_neotevrena_puvodni, (OKNO_sirka - 150, 30))
