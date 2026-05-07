@@ -8,6 +8,7 @@ OKNO_vyska = 768
 okno = pygame.display.set_mode((OKNO_sirka, OKNO_vyska))
 fullscreen = False
 hra = True
+shop = False
 kotva = False
 mapa_otevrena = False
 
@@ -142,8 +143,23 @@ velikost_lode_x = lod_surface.get_width()
 velikost_lode_y = lod_surface.get_height()
 maximalni_unosnost_zlata = aktualni_lod["maximalni_unosnost_zlata"]
 maximalni_pocet_posatky = aktualni_lod["maximalni_pocet_posatky"]
-aktualni_zlato = 0
+aktualni_zlato = 10000
 aktualni_posatky = aktualni_lod["pocet_posatky"]
+zakoupene_lodi = {"basic_lod": True}
+
+
+def nastav_aktualni_lod(nova_lod):
+    global aktualni_lod, lod_surface, aktualni_rychlost_lode, velikost_lode_x, velikost_lode_y
+    global maximalni_unosnost_zlata, maximalni_pocet_posatky, aktualni_posatky
+
+    aktualni_lod = nova_lod
+    lod_surface = nova_lod["obrazek"]
+    aktualni_rychlost_lode = nova_lod["rychlost"]
+    velikost_lode_x = lod_surface.get_width()
+    velikost_lode_y = lod_surface.get_height()
+    maximalni_unosnost_zlata = nova_lod["maximalni_unosnost_zlata"]
+    maximalni_pocet_posatky = nova_lod["maximalni_pocet_posatky"]
+    aktualni_posatky = nova_lod["pocet_posatky"]
 
 
 
@@ -283,7 +299,14 @@ while hra:
             okno.blit(obrazek_ostrovu, (pozice_x, pozice_y))
 
 
-
+        if vzdalenost < polomer_kolize + 50 and nazev == "shop_ostrov":
+            text_shop = font.render("Press E to enter shop", True, (255, 255, 255))
+            okno.blit(text_shop, (stred_x - text_shop.get_width() // 2, stred_y - vyska_elipsy // 2 - 30))
+        
+        if vzdalenost < polomer_kolize + 50 and nazev == "shop_ostrov":
+            if stisknuto[pygame.K_e]:
+                hra = False
+                shop = True
 
 
     if not mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
@@ -395,3 +418,106 @@ while hra:
     pygame.display.flip()
     clock.tick(60)
     
+
+    while shop:
+        mouse_click_shop = False
+        mys_pozice_shop = pygame.mouse.get_pos()
+        stisknuto_shop = pygame.key.get_pressed()
+        for udalost in pygame.event.get():
+            if udalost.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if udalost.type == pygame.MOUSEBUTTONDOWN and udalost.button == 1:
+                mouse_click_shop = True
+
+        if stisknuto_shop[pygame.K_ESCAPE]:
+            shop = False
+            hra = True
+
+        okno.fill((17, 24, 35))
+
+        prekryv = pygame.Surface((OKNO_sirka, OKNO_vyska), pygame.SRCALPHA)
+        prekryv.fill((0, 0, 0, 120))
+        okno.blit(prekryv, (0, 0))
+
+        ramec = pygame.Rect(70, 40, OKNO_sirka - 140, OKNO_vyska - 80)
+        pygame.draw.rect(okno, (33, 45, 60), ramec, border_radius=18)
+        pygame.draw.rect(okno, (179, 145, 73), ramec, 4, border_radius=18)
+
+        titul = pygame.font.Font("pirat_font.ttf", 40).render("Shipyard Shop", True, (245, 232, 198))
+        okno.blit(titul, (OKNO_sirka // 2 - titul.get_width() // 2, 58))
+
+        podtitul = font.render("Buy stronger ships and upgrade your crew capacity", True, (220, 220, 220))
+        okno.blit(podtitul, (OKNO_sirka // 2 - podtitul.get_width() // 2, 108))
+
+        stav_text = zlato_font.render(f"Gold: {aktualni_zlato}", True, (255, 215, 0))
+        okno.blit(stav_text, (100, 155))
+        lod_text = font.render(f"Current ship: {aktualni_lod['nazev']}", True, (255, 255, 255))
+        okno.blit(lod_text, (100, 190))
+
+        shop_lodi = [lod_informace[1], lod_informace[2]]
+        karta_sirka = 470
+        karta_vyska = 460
+        zacatek_x = 110
+        mezera = 80
+        karta_y = 250
+
+        for index, lod in enumerate(shop_lodi):
+            karta_x = zacatek_x + index * (karta_sirka + mezera)
+            karta = pygame.Rect(karta_x, karta_y, karta_sirka, karta_vyska)
+            pygame.draw.rect(okno, (25, 34, 48), karta, border_radius=16)
+            pygame.draw.rect(okno, (110, 92, 48), karta, 3, border_radius=16)
+
+            nazev = zlato_font.render(lod["nazev"].replace("_", " ").title(), True, (245, 232, 198))
+            okno.blit(nazev, (karta.centerx - nazev.get_width() // 2, karta.y + 18))
+
+            obrazek = pygame.transform.scale(lod["obrazek"], (180, 180))
+            okno.blit(obrazek, (karta.centerx - obrazek.get_width() // 2, karta.y + 55))
+
+            ceny_text = font.render(f"Price: {lod['cena']} gold", True, (255, 215, 0))
+            okno.blit(ceny_text, (karta.x + 22, karta.y + 250))
+
+            staty = [
+                f"Speed: {lod['rychlost']}",
+                f"Crew: {lod['pocet_posatky']} / {lod['maximalni_pocet_posatky']}",
+                f"Gold hold: {lod['maximalni_unosnost_zlata']}",
+            ]
+
+            for radek_index, radek in enumerate(staty):
+                stat_text = font.render(radek, True, (230, 230, 230))
+                okno.blit(stat_text, (karta.x + 22, karta.y + 285 + radek_index * 28))
+
+            if lod["nazev"] == aktualni_lod["nazev"]:
+                btn_text = "Active"
+                btn_barva = (70, 140, 90)
+            elif zakoupene_lodi.get(lod["nazev"], False):
+                btn_text = "Use ship"
+                btn_barva = (95, 120, 170)
+            elif aktualni_zlato >= lod["cena"]:
+                btn_text = "Buy"
+                btn_barva = (160, 120, 40)
+            else:
+                btn_text = "Not enough gold"
+                btn_barva = (110, 70, 70)
+
+            btn = pygame.Rect(karta.x + 22, karta.bottom - 62, karta.width - 44, 42)
+            pygame.draw.rect(okno, btn_barva, btn, border_radius=10)
+            btn_label = font.render(btn_text, True, (255, 255, 255))
+            okno.blit(btn_label, (btn.centerx - btn_label.get_width() // 2, btn.centery - btn_label.get_height() // 2))
+
+            if mouse_click_shop and btn.collidepoint(mys_pozice_shop):
+                if lod["nazev"] == aktualni_lod["nazev"]:
+                    pass
+                elif not zakoupene_lodi.get(lod["nazev"], False) and aktualni_zlato >= lod["cena"]:
+                    aktualni_zlato -= lod["cena"]
+                    zakoupene_lodi[lod["nazev"]] = True
+                    nastav_aktualni_lod(lod)
+                elif zakoupene_lodi.get(lod["nazev"], False):
+                    nastav_aktualni_lod(lod)
+
+        info = font.render("ESC = back to sea", True, (230, 230, 230))
+        okno.blit(info, (OKNO_sirka - info.get_width() - 110, OKNO_vyska - 60))
+
+        pygame.display.flip()
+        clock.tick(60)
