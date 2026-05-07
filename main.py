@@ -42,6 +42,8 @@ kotva_vetsi = pygame.transform.scale(kotva_obrazek, (kotva_obrazek.get_width() *
 kotva_dole = pygame.image.load("kotva_dole.png")
 kotva_dole_vetsi = pygame.transform.scale(kotva_dole, (kotva_dole.get_width() * 1.1, kotva_dole.get_height() * 1.1))
 basic_lod = pygame.image.load("basic_lod.png")
+pokrocila_lod = pygame.image.load("pokrocila_lod.png")
+profesionalni_lod = pygame.image.load("profesionalni_lod.png")
 
 #recty
 mapa_neotevrena_puvodni_rect = mapa_neotevrena_puvodni.get_rect(topleft=(OKNO_sirka - 150, 30))
@@ -51,7 +53,10 @@ kotva_rect = kotva_obrazek.get_rect(topleft=(OKNO_sirka - 140, 610))
 kotva_dole_rect = kotva_dole.get_rect(topleft=(OKNO_sirka - 140, 610))
 
 #fonty
-font = pygame.font.SysFont("Arial", 24)
+
+font = pygame.font.Font("pirat_font.ttf", 24)
+zlato_font = pygame.font.Font("pirat_font.ttf", 28)
+posatky_font = pygame.font.Font("pirat_font.ttf", 28)
 
 # Loď se otáčí podle směru.
 lod_surface = basic_lod
@@ -74,7 +79,8 @@ rozestup_ostrovu = 2000
 ostrov_spawn = [
     {"x": 700, "y": 700, "nazev": "lava_ostrov"},
     {"x": -2500, "y": -1500, "nazev": "shop_ostrov"},
-    {"x": -4000, "y": -3000, "nazev": "lava_ostrov"},
+    {"x": -4000, "y": -3000, "nazev": "cerv_ostrov"},
+    {"x": 3000, "y": -2000, "nazev": "magma_ostrov"},
 ]
 
 
@@ -86,16 +92,58 @@ vyber_ostrovu = [
     {
         "nazev": "shop_ostrov",
         "obrazek": pygame.image.load("shop_ostrov.png"),
+    },
+    {
+        "nazev": "cerv_ostrov",
+        "obrazek": pygame.image.load("cerv_ostrov.png"),
+    },
+    {
+        "nazev": "magma_ostrov",
+        "obrazek": pygame.image.load("magma_ostrov.png"),
     }
 ]
 
-#recty ostrovů
+#lod statistiky
 
+lod_informace = [
+    {
+        "nazev": "basic_lod",
+        "rychlost": 2,
+        "obrazek": basic_lod,
+        "maximalni_pocet_posatky": 5,
+        "maximalni_unosnost_zlata": 1000,
+        "cena": 0,
+        "pocet_posatky": 5,
+    },
+    {
+        "nazev": "pokrocila_lod",
+        "rychlost": 3,
+        "obrazek": pokrocila_lod,
+        "maximalni_pocet_posatky": 10,
+        "maximalni_unosnost_zlata": 5000,
+        "cena": 1000,
+        "pocet_posatky": 10,
+    },
+    {
+        "nazev": "profesionalni_lod",
+        "rychlost": 4,
+        "obrazek": profesionalni_lod,
+        "maximalni_pocet_posatky": 15,
+        "maximalni_unosnost_zlata": 10000,
+        "cena": 5000,
+        "pocet_posatky": 15,
+    },
+]
 
-
-
-
-
+aktualni_lod = lod_informace[0]
+lod_surface = aktualni_lod["obrazek"]
+aktualni_rychlost_lode = aktualni_lod["rychlost"]
+velikost_lode_x = lod_surface.get_width()
+velikost_lode_y = lod_surface.get_height()
+maximalni_unosnost_zlata = aktualni_lod["maximalni_unosnost_zlata"]
+maximalni_pocet_posatky = aktualni_lod["maximalni_pocet_posatky"]
+aktualni_zlato = 0
+aktualni_posatky = aktualni_lod["pocet_posatky"]
 
 
 
@@ -222,7 +270,10 @@ while hra:
             
             # Změní se barva elipsy podle kolize
             if vzdalenost < polomer_kolize + 50:
-                barva_elipsy = (255, 0, 0)  # Červená když je blízko
+                if nazev == "shop_ostrov":
+                    barva_elipsy = (0, 255, 0)  # Zelená u shopu když je blízko
+                else:
+                    barva_elipsy = (255, 0, 0)  # Červená u ostatních ostrovů když je blízko
             else:
                 barva_elipsy = (100, 150, 200)  # Modrá normálně
             
@@ -254,6 +305,10 @@ while hra:
         pygame.draw.circle(okno, (30, 30, 30), (stred_x, stred_y), 6)
         distance_text = font.render(f"Position: ({int(-pozice_lode_x)}, {int(-pozice_lode_y)})", True, (255, 255, 255))
         okno.blit(distance_text, (20, kompas_rect.bottom + 10))
+        zlato_text = zlato_font.render(f"Gold: {aktualni_zlato}/{maximalni_unosnost_zlata}", True, (255, 215, 0))
+        okno.blit(zlato_text, (20, 720))
+        posatky_text = posatky_font.render(f"Crew: {aktualni_posatky}/{maximalni_pocet_posatky}", True, (255, 255, 255))
+        okno.blit(posatky_text, (200, 720))
 
         if kotva:
             if kotva_rect.collidepoint(mys_pozice):
@@ -268,7 +323,69 @@ while hra:
     
 
     if mapa_otevrena:
-        okno.blit(mapa_background, (50, 50))
+        # Podklad mapy a její hranice
+        mapa_x_offset = 50
+        mapa_y_offset = 50
+        mapa_sirka = mapa_background.get_width()
+        mapa_vyska = mapa_background.get_height()
+        mapa_inset = 100
+        mapa_rect = pygame.Rect(
+            mapa_x_offset + mapa_inset,
+            mapa_y_offset + mapa_inset,
+            mapa_sirka - mapa_inset * 2,
+            mapa_vyska - mapa_inset * 2,
+        )
+        stred_mapa_x = mapa_rect.centerx
+        stred_mapa_y = mapa_rect.centery
+        
+        okno.blit(mapa_background, (mapa_x_offset, mapa_y_offset))
+        
+        # Modrá plocha je přímo na obrázku mapy, ne pod ním
+        pygame.draw.rect(okno, (13, 55, 102), mapa_rect)
+        
+        # Všechny prvky mapy kreslit jen uvnitř mapového panelu
+        predchozi_clip = okno.get_clip()
+        okno.set_clip(mapa_rect)
+        
+        # Škálování - mapa je 5000x5000 světových jednotek
+        skala_x = mapa_rect.width / MAPA_SIRKA
+        skala_y = mapa_rect.height / MAPA_VYSKA
+        
+        # Vykreslení ostrovů na mapě
+        for ostrov in ostrov_spawn:
+            nazev = ostrov["nazev"]
+            data_ostrovu = next((o for o in vyber_ostrovu if o["nazev"] == nazev), None)
+            if data_ostrovu:
+                # Ostrovy se pohybují podle pozice lodě, hráč zůstává uprostřed mapy
+                mapa_ostrov_x = stred_mapa_x + (ostrov["x"] - pozice_lode_x) * skala_x
+                mapa_ostrov_y = stred_mapa_y + (ostrov["y"] - pozice_lode_y) * skala_y
+                
+                # Zvětšený obraz ostrova na mapě (30% původní velikosti)
+                obrazek_ostrovu_mala = data_ostrovu["obrazek"]
+                sirka_ostrova = int(obrazek_ostrovu_mala.get_width() * 0.3)
+                vyska_ostrova = int(obrazek_ostrovu_mala.get_height() * 0.3)
+                
+                if sirka_ostrova > 0 and vyska_ostrova > 0:
+                    obrazek_ostrovu_scaled = pygame.transform.scale(obrazek_ostrovu_mala, (sirka_ostrova, vyska_ostrova))
+                    okno.blit(obrazek_ostrovu_scaled, (mapa_ostrov_x - sirka_ostrova // 2, mapa_ostrov_y - vyska_ostrova // 2))
+        
+        # Vykreslení šipky hráče v centru mapy
+        # Šipka ukazuje stejný směr jako loď v herním okně
+        sirka_sipky = 15
+        vyska_sipky = 25
+        radiany = math.radians(uhel_kompasu)
+        cos_a = math.cos(radiany)
+        sin_a = math.sin(radiany)
+        
+        bod1 = (stred_mapa_x + sin_a * vyska_sipky, stred_mapa_y - cos_a * vyska_sipky)  # Špička
+        bod2 = (stred_mapa_x - sin_a * 5 - cos_a * sirka_sipky / 2, stred_mapa_y + cos_a * 5 - sin_a * sirka_sipky / 2)
+        bod3 = (stred_mapa_x - sin_a * 5 + cos_a * sirka_sipky / 2, stred_mapa_y + cos_a * 5 + sin_a * sirka_sipky / 2)
+        
+        pygame.draw.polygon(okno, (220, 30, 30), [bod1, bod2, bod3])  # Červená šipka
+        pygame.draw.circle(okno, (255, 255, 255), (int(stred_mapa_x), int(stred_mapa_y)), 3)  # Bílý střed
+        
+        okno.set_clip(predchozi_clip)
+        
         okno.blit(mapa_exit, (OKNO_sirka - 180, 630))
         if mapa_exit_rect.collidepoint(mys_pozice):
             okno.blit(mapa_exit_vetsi, (OKNO_sirka - 185, 625))
