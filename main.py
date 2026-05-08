@@ -74,6 +74,7 @@ kompas_rucicka_offset_y = 20
 # Animace moře
 cas_animace = 0
 rychlost_vln = 0.01  # Velmi pomalý pohyb vln
+boj_interval_ms = 350
 
 clock = pygame.time.Clock()
 
@@ -158,15 +159,33 @@ def generate_ostrov_spawn(vyber, total_islands=12, map_w=MAPA_SIRKA, map_h=MAPA_
         name = random.choice(names)
         x = random.randint(-map_w, map_w)
         y = random.randint(-map_h, map_h)
+        crew = random.randint(5, 25)
         if all(math.hypot(x - s["x"], y - s["y"]) >= min_dist for s in spawn):
-            spawn.append({"x": x, "y": y, "nazev": name})
+            spawn.append({
+                "x": x,
+                "y": y,
+                "nazev": name,
+                "posatky": crew,
+                "odmena": crew * 100,
+                "dobyt": False,
+                "posledni_utok": 0,
+            })
         attempts += 1
 
     while len(spawn) < total_islands:
         name = random.choice(names)
         x = random.randint(-map_w, map_w)
         y = random.randint(-map_h, map_h)
-        spawn.append({"x": x, "y": y, "nazev": name})
+        crew = random.randint(5, 25)
+        spawn.append({
+            "x": x,
+            "y": y,
+            "nazev": name,
+            "posatky": crew,
+            "odmena": crew * 100,
+            "dobyt": False,
+            "posledni_utok": 0,
+        })
 
     return spawn
 
@@ -186,6 +205,18 @@ def nastav_aktualni_lod(nova_lod):
     maximalni_unosnost_zlata = nova_lod["maximalni_unosnost_zlata"]
     maximalni_pocet_posatky = nova_lod["maximalni_pocet_posatky"]
     aktualni_posatky = nova_lod["pocet_posatky"]
+
+
+def respawn_hrace():
+    global pozice_lode_x, pozice_lode_y, aktualni_zlato, uhel_kompasu, kotva, mapa_otevrena, cas_vytazeni_kotvy
+    pozice_lode_x = 0
+    pozice_lode_y = 0
+    aktualni_zlato = 0
+    uhel_kompasu = 0
+    kotva = False
+    mapa_otevrena = False
+    cas_vytazeni_kotvy = pygame.time.get_ticks()
+    nastav_aktualni_lod(aktualni_lod)
 
 
 
@@ -301,6 +332,8 @@ while hra:
             # Elipsa kolem ostrova
             sirka_elipsy = 800
             vyska_elipsy = 800
+            crew_count = ostrov.get("posatky", 0)
+            ostrov_dobyt = ostrov.get("dobyt", False)
             
             # Detekce kolize - vzdálenost mezi lodí a ostrovem
             dx = ostrov["x"] - (pozice_lode_x + velikost_lode_x / 2)
@@ -310,12 +343,16 @@ while hra:
             # Poloměr kolize (průměr elipsy)
             polomer_kolize = (sirka_elipsy + vyska_elipsy) / 4
             
-            # Změní se barva elipsy podle kolize
-            if vzdalenost < polomer_kolize + 50:
-                if nazev == "shop_ostrov":
-                    barva_elipsy = (0, 255, 0)  # Zelená u shopu když je blízko
+            # Změní se barva elipsy podle kolize a dobytí
+            if nazev == "shop_ostrov":
+                if vzdalenost < polomer_kolize + 50:
+                    barva_elipsy = (0, 255, 0)
                 else:
-                    barva_elipsy = (255, 0, 0)  # Červená u ostatních ostrovů když je blízko
+                    barva_elipsy = (100, 150, 200)
+            elif ostrov_dobyt:
+                barva_elipsy = (0, 255, 0)  # Zelená po dobytí
+            elif vzdalenost < polomer_kolize + 50:
+                barva_elipsy = (255, 0, 0)  # Červená v boji
             else:
                 barva_elipsy = (100, 150, 200)  # Modrá normálně
             
@@ -323,6 +360,39 @@ while hra:
             
             # Obrázek ostrova
             okno.blit(obrazek_ostrovu, (pozice_x, pozice_y))
+
+            if nazev != "shop_ostrov":
+                crew_text_barva = (180, 220, 180) if ostrov_dobyt else (255, 255, 255)
+                crew_text = font.render(f"Crew: {crew_count if not ostrov_dobyt else 0}", True, crew_text_barva)
+                okno.blit(crew_text, (stred_x - crew_text.get_width() // 2, stred_y - vyska_elipsy // 2 - 56))
+
+            if nazev != "shop_ostrov" and not ostrov_dobyt and vzdalenost < polomer_kolize + 50:
+                text_boj = font.render("Battle in progress", True, (255, 255, 255))
+                okno.blit(text_boj, (stred_x - text_boj.get_width() // 2, stred_y - vyska_elipsy // 2 - 30))
+
+                aktualni_cas = pygame.time.get_ticks()
+                if aktualni_cas - ostrov.get("posledni_utok", 0) >= boj_interval_ms:
+                    ostrov["posledni_utok"] = aktualni_cas
+
+                    if crew_count > 0 and aktualni_posatky > 0:
+                        novy_crew_ostrova = max(0, crew_count - 1)
+                        nova_moje_posadka = max(0, aktualni_posatky - 1)
+                        ostrov["posatky"] = novy_crew_ostrova
+                        aktualni_posatky = nova_moje_posadka
+
+                    if aktualni_posatky <= 0:
+                        respawn_hrace()
+                        break
+
+                    if ostrov["posatky"] <= 0 and not ostrov["dobyt"]:
+                        ostrov["dobyt"] = True
+                        ostrov_dobyt = True
+                        barva_elipsy = (0, 255, 0)
+                        aktualni_zlato += ostrov.get("odmena", crew_count * 100)
+                        crew_text = font.render("Crew: 0", True, (180, 220, 180))
+                        okno.blit(crew_text, (stred_x - crew_text.get_width() // 2, stred_y - vyska_elipsy // 2 - 56))
+                        reward_text = font.render(f"+{ostrov.get('odmena', crew_count * 100)} gold", True, (255, 215, 0))
+                        okno.blit(reward_text, (stred_x - reward_text.get_width() // 2, stred_y - vyska_elipsy // 2 - 8))
 
 
         if vzdalenost < polomer_kolize + 50 and nazev == "shop_ostrov":
