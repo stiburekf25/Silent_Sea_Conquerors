@@ -2,6 +2,10 @@ import pygame
 pygame.init()
 import sys
 import math
+import random
+import os
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 OKNO_sirka = 1280
 OKNO_vyska = 768
@@ -11,6 +15,7 @@ hra = True
 shop = False
 kotva = False
 mapa_otevrena = False
+shop_page = "ships"  # can be "ships" or "crew"
 
 
 #Barvy
@@ -76,13 +81,7 @@ clock = pygame.time.Clock()
 #ostrovy
 
 rozestup_ostrovu = 2000
-
-ostrov_spawn = [
-    {"x": 700, "y": 700, "nazev": "lava_ostrov"},
-    {"x": -2500, "y": -1500, "nazev": "shop_ostrov"},
-    {"x": -4000, "y": -3000, "nazev": "cerv_ostrov"},
-    {"x": 3000, "y": -2000, "nazev": "magma_ostrov"},
-]
+# island spawn will be generated automatically below
 
 
 vyber_ostrovu = [
@@ -117,7 +116,7 @@ lod_informace = [
         "pocet_posatky": 5,
     },
     {
-        "nazev": "pokrocila_lod",
+        "nazev": "advanced_ship",
         "rychlost": 3,
         "obrazek": pokrocila_lod,
         "maximalni_pocet_posatky": 10,
@@ -126,7 +125,7 @@ lod_informace = [
         "pocet_posatky": 10,
     },
     {
-        "nazev": "profesionalni_lod",
+        "nazev": "professional_ship",
         "rychlost": 4,
         "obrazek": profesionalni_lod,
         "maximalni_pocet_posatky": 15,
@@ -146,6 +145,33 @@ maximalni_pocet_posatky = aktualni_lod["maximalni_pocet_posatky"]
 aktualni_zlato = 10000
 aktualni_posatky = aktualni_lod["pocet_posatky"]
 zakoupene_lodi = {"basic_lod": True}
+
+
+def generate_ostrov_spawn(vyber, total_islands=12, map_w=MAPA_SIRKA, map_h=MAPA_VYSKA, min_dist=rozestup_ostrovu):
+    """Generate island spawns with repeated names allowed."""
+    spawn = []
+    names = [v["nazev"] for v in vyber]
+    attempts = 0
+    max_attempts = 20000
+
+    while len(spawn) < total_islands and attempts < max_attempts:
+        name = random.choice(names)
+        x = random.randint(-map_w, map_w)
+        y = random.randint(-map_h, map_h)
+        if all(math.hypot(x - s["x"], y - s["y"]) >= min_dist for s in spawn):
+            spawn.append({"x": x, "y": y, "nazev": name})
+        attempts += 1
+
+    while len(spawn) < total_islands:
+        name = random.choice(names)
+        x = random.randint(-map_w, map_w)
+        y = random.randint(-map_h, map_h)
+        spawn.append({"x": x, "y": y, "nazev": name})
+
+    return spawn
+
+
+ostrov_spawn = generate_ostrov_spawn(vyber_ostrovu, total_islands=12)
 
 
 def nastav_aktualni_lod(nova_lod):
@@ -331,7 +357,7 @@ while hra:
         zlato_text = zlato_font.render(f"Gold: {aktualni_zlato}/{maximalni_unosnost_zlata}", True, (255, 215, 0))
         okno.blit(zlato_text, (20, 720))
         posatky_text = posatky_font.render(f"Crew: {aktualni_posatky}/{maximalni_pocet_posatky}", True, (255, 255, 255))
-        okno.blit(posatky_text, (200, 720))
+        okno.blit(posatky_text, (240, 720))
 
         if kotva:
             if kotva_rect.collidepoint(mys_pozice):
@@ -448,76 +474,155 @@ while hra:
         titul = pygame.font.Font("pirat_font.ttf", 40).render("Shipyard Shop", True, (245, 232, 198))
         okno.blit(titul, (OKNO_sirka // 2 - titul.get_width() // 2, 58))
 
-        podtitul = font.render("Buy stronger ships and upgrade your crew capacity", True, (220, 220, 220))
+        podtitul = font.render("Buy stronger ships and recruit crew", True, (220, 220, 220))
         okno.blit(podtitul, (OKNO_sirka // 2 - podtitul.get_width() // 2, 108))
 
         stav_text = zlato_font.render(f"Gold: {aktualni_zlato}", True, (255, 215, 0))
-        okno.blit(stav_text, (100, 155))
-        lod_text = font.render(f"Current ship: {aktualni_lod['nazev']}", True, (255, 255, 255))
-        okno.blit(lod_text, (100, 190))
+        okno.blit(stav_text, (OKNO_sirka - 320, 155))
 
-        shop_lodi = [lod_informace[1], lod_informace[2]]
-        karta_sirka = 470
-        karta_vyska = 460
-        zacatek_x = 110
-        mezera = 80
-        karta_y = 250
+        # Tabs: Ships | Crew
+        tab_ships = pygame.Rect(110, 140, 160, 36)
+        tab_crew = pygame.Rect(280, 140, 160, 36)
+        if shop_page == "ships":
+            pygame.draw.rect(okno, (140, 110, 60), tab_ships, border_radius=8)
+            pygame.draw.rect(okno, (60, 70, 80), tab_crew, border_radius=8)
+        else:
+            pygame.draw.rect(okno, (60, 70, 80), tab_ships, border_radius=8)
+            pygame.draw.rect(okno, (140, 110, 60), tab_crew, border_radius=8)
 
-        for index, lod in enumerate(shop_lodi):
-            karta_x = zacatek_x + index * (karta_sirka + mezera)
-            karta = pygame.Rect(karta_x, karta_y, karta_sirka, karta_vyska)
+        okno.blit(font.render("Ships", True, (245, 232, 198)), (tab_ships.x + 20, tab_ships.y + 6))
+        okno.blit(font.render("Crew", True, (245, 232, 198)), (tab_crew.x + 20, tab_crew.y + 6))
+
+        if mouse_click_shop and tab_ships.collidepoint(mys_pozice_shop):
+            shop_page = "ships"
+        if mouse_click_shop and tab_crew.collidepoint(mys_pozice_shop):
+            shop_page = "crew"
+
+        # Crew shop constants
+        crew_price = 150
+
+        if shop_page == "ships":
+            shop_lodi = [lod_informace[1], lod_informace[2]]
+            karta_sirka = 470
+            karta_vyska = 460
+            zacatek_x = 110
+            mezera = 80
+            karta_y = 250
+
+            for index, lod in enumerate(shop_lodi):
+                karta_x = zacatek_x + index * (karta_sirka + mezera)
+                karta = pygame.Rect(karta_x, karta_y, karta_sirka, karta_vyska)
+                pygame.draw.rect(okno, (25, 34, 48), karta, border_radius=16)
+                pygame.draw.rect(okno, (110, 92, 48), karta, 3, border_radius=16)
+
+                nazev = zlato_font.render(lod["nazev"].replace("_", " ").title(), True, (245, 232, 198))
+                okno.blit(nazev, (karta.centerx - nazev.get_width() // 2, karta.y + 18))
+
+                obrazek = pygame.transform.scale(lod["obrazek"], (180, 180))
+                okno.blit(obrazek, (karta.centerx - obrazek.get_width() // 2, karta.y + 55))
+
+                ceny_text = font.render(f"Price: {lod['cena']} gold", True, (255, 215, 0))
+                okno.blit(ceny_text, (karta.x + 22, karta.y + 250))
+
+                staty = [
+                    f"Speed: {lod['rychlost']}",
+                    f"Crew: {lod['pocet_posatky']} / {lod['maximalni_pocet_posatky']}",
+                    f"Gold hold: {lod['maximalni_unosnost_zlata']}",
+                ]
+
+                for radek_index, radek in enumerate(staty):
+                    stat_text = font.render(radek, True, (230, 230, 230))
+                    okno.blit(stat_text, (karta.x + 22, karta.y + 285 + radek_index * 28))
+
+                if lod["nazev"] == aktualni_lod["nazev"]:
+                    btn_text = "Active"
+                    btn_barva = (70, 140, 90)
+                elif zakoupene_lodi.get(lod["nazev"], False):
+                    btn_text = "Use ship"
+                    btn_barva = (95, 120, 170)
+                elif aktualni_zlato >= lod["cena"]:
+                    btn_text = "Buy"
+                    btn_barva = (160, 120, 40)
+                else:
+                    btn_text = "Not enough gold"
+                    btn_barva = (110, 70, 70)
+
+                btn = pygame.Rect(karta.x + 22, karta.bottom - 62, karta.width - 44, 42)
+                pygame.draw.rect(okno, btn_barva, btn, border_radius=10)
+                btn_label = font.render(btn_text, True, (255, 255, 255))
+                okno.blit(btn_label, (btn.centerx - btn_label.get_width() // 2, btn.centery - btn_label.get_height() // 2))
+
+                if mouse_click_shop and btn.collidepoint(mys_pozice_shop):
+                    if lod["nazev"] == aktualni_lod["nazev"]:
+                        pass
+                    elif not zakoupene_lodi.get(lod["nazev"], False) and aktualni_zlato >= lod["cena"]:
+                        aktualni_zlato -= lod["cena"]
+                        zakoupene_lodi[lod["nazev"]] = True
+                        nastav_aktualni_lod(lod)
+                    elif zakoupene_lodi.get(lod["nazev"], False):
+                        nastav_aktualni_lod(lod)
+
+        else:  # crew page
+            # Card for crew recruitment
+            karta = pygame.Rect(110, 200, OKNO_sirka - 220, 440)
             pygame.draw.rect(okno, (25, 34, 48), karta, border_radius=16)
             pygame.draw.rect(okno, (110, 92, 48), karta, 3, border_radius=16)
 
-            nazev = zlato_font.render(lod["nazev"].replace("_", " ").title(), True, (245, 232, 198))
-            okno.blit(nazev, (karta.centerx - nazev.get_width() // 2, karta.y + 18))
+            nadpis = zlato_font.render("Recruit Crew", True, (245, 232, 198))
+            okno.blit(nadpis, (karta.x + 28, karta.y + 18))
 
-            obrazek = pygame.transform.scale(lod["obrazek"], (180, 180))
-            okno.blit(obrazek, (karta.centerx - obrazek.get_width() // 2, karta.y + 55))
+            popis = font.render(f"Crew: {aktualni_posatky} / {maximalni_pocet_posatky}", True, (230, 230, 230))
+            okno.blit(popis, (karta.x + 28, karta.y + 68))
 
-            ceny_text = font.render(f"Price: {lod['cena']} gold", True, (255, 215, 0))
-            okno.blit(ceny_text, (karta.x + 22, karta.y + 250))
+            price_text = font.render(f"Price per crew: {crew_price} gold", True, (255, 215, 0))
+            okno.blit(price_text, (karta.x + 28, karta.y + 108))
 
-            staty = [
-                f"Speed: {lod['rychlost']}",
-                f"Crew: {lod['pocet_posatky']} / {lod['maximalni_pocet_posatky']}",
-                f"Gold hold: {lod['maximalni_unosnost_zlata']}",
-            ]
-
-            for radek_index, radek in enumerate(staty):
-                stat_text = font.render(radek, True, (230, 230, 230))
-                okno.blit(stat_text, (karta.x + 22, karta.y + 285 + radek_index * 28))
-
-            if lod["nazev"] == aktualni_lod["nazev"]:
-                btn_text = "Active"
-                btn_barva = (70, 140, 90)
-            elif zakoupene_lodi.get(lod["nazev"], False):
-                btn_text = "Use ship"
-                btn_barva = (95, 120, 170)
-            elif aktualni_zlato >= lod["cena"]:
-                btn_text = "Buy"
-                btn_barva = (160, 120, 40)
+            # Single buy button
+            buy_one = pygame.Rect(karta.x + 28, karta.y + 160, 220, 48)
+            if aktualni_posatky >= maximalni_pocet_posatky:
+                pygame.draw.rect(okno, (90, 90, 90), buy_one, border_radius=10)
+                okno.blit(font.render("Full capacity", True, (200, 200, 200)), (buy_one.centerx - 60, buy_one.centery - 10))
+            elif aktualni_zlato < crew_price:
+                pygame.draw.rect(okno, (110, 70, 70), buy_one, border_radius=10)
+                okno.blit(font.render("Not enough gold", True, (255, 255, 255)), (buy_one.centerx - 80, buy_one.centery - 10))
             else:
-                btn_text = "Not enough gold"
-                btn_barva = (110, 70, 70)
+                pygame.draw.rect(okno, (160, 120, 40), buy_one, border_radius=10)
+                okno.blit(font.render("Hire 1 crew", True, (255, 255, 255)), (buy_one.centerx - 50, buy_one.centery - 10))
 
-            btn = pygame.Rect(karta.x + 22, karta.bottom - 62, karta.width - 44, 42)
-            pygame.draw.rect(okno, btn_barva, btn, border_radius=10)
-            btn_label = font.render(btn_text, True, (255, 255, 255))
-            okno.blit(btn_label, (btn.centerx - btn_label.get_width() // 2, btn.centery - btn_label.get_height() // 2))
+            # Buy max button
+            buy_max = pygame.Rect(karta.x + 28, karta.y + 220, 220, 48)
+            needed = maximalni_pocet_posatky - aktualni_posatky
+            cost_max = needed * crew_price
+            if needed <= 0:
+                pygame.draw.rect(okno, (90, 90, 90), buy_max, border_radius=10)
+                okno.blit(font.render("Already full", True, (200, 200, 200)), (buy_max.centerx - 50, buy_max.centery - 10))
+            elif aktualni_zlato < cost_max:
+                pygame.draw.rect(okno, (110, 70, 70), buy_max, border_radius=10)
+                okno.blit(font.render(f"Need {cost_max} gold", True, (255, 255, 255)), (buy_max.centerx - 60, buy_max.centery - 10))
+            else:
+                pygame.draw.rect(okno, (95, 120, 170), buy_max, border_radius=10)
+                okno.blit(font.render(f"Hire {needed} (Fill)", True, (255, 255, 255)), (buy_max.centerx - 70, buy_max.centery - 10))
 
-            if mouse_click_shop and btn.collidepoint(mys_pozice_shop):
-                if lod["nazev"] == aktualni_lod["nazev"]:
-                    pass
-                elif not zakoupene_lodi.get(lod["nazev"], False) and aktualni_zlato >= lod["cena"]:
-                    aktualni_zlato -= lod["cena"]
-                    zakoupene_lodi[lod["nazev"]] = True
-                    nastav_aktualni_lod(lod)
-                elif zakoupene_lodi.get(lod["nazev"], False):
-                    nastav_aktualni_lod(lod)
+            # Quick info
+            info_lines = [
+                f"Max crew on ship: {maximalni_pocet_posatky}",
+            ]
+            for i, line in enumerate(info_lines):
+                okno.blit(font.render(line, True, (200, 200, 200)), (karta.x + 300, karta.y + 68 + i * 30))
+
+            # Handle clicks
+            if mouse_click_shop and buy_one.collidepoint(mys_pozice_shop):
+                if aktualni_posatky < maximalni_pocet_posatky and aktualni_zlato >= crew_price:
+                    aktualni_zlato -= crew_price
+                    aktualni_posatky += 1
+
+            if mouse_click_shop and buy_max.collidepoint(mys_pozice_shop):
+                if needed > 0 and aktualni_zlato >= cost_max:
+                    aktualni_zlato -= cost_max
+                    aktualni_posatky = maximalni_pocet_posatky
 
         info = font.render("ESC = back to sea", True, (230, 230, 230))
-        okno.blit(info, (OKNO_sirka - info.get_width() - 110, OKNO_vyska - 60))
+        okno.blit(info, (OKNO_sirka - info.get_width() - 110, OKNO_vyska - 680))
 
         pygame.display.flip()
         clock.tick(60)
