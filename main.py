@@ -74,7 +74,11 @@ kompas_rucicka_offset_y = 20
 # Animace moře
 cas_animace = 0
 rychlost_vln = 0.01  # Velmi pomalý pohyb vln
-boj_interval_ms = 350
+boj_interval_ms = 850
+boj_projektil_rychlost = 7
+boj_projektil_velikost = 8
+boj_projektil_barva = (255, 230, 40)
+bojove_projektily = []
 
 clock = pygame.time.Clock()
 
@@ -101,6 +105,14 @@ vyber_ostrovu = [
     {
         "nazev": "magma_ostrov",
         "obrazek": pygame.image.load("magma_ostrov.png"),
+    },
+    {
+        "nazev": "amerika_ostrov",
+        "obrazek": pygame.image.load("amerika_ostrov.png"),
+    },
+    {
+        "nazev": "kraken_ostrov",
+        "obrazek": pygame.image.load("kraken_ostrov.png"),
     }
 ]
 
@@ -148,6 +160,58 @@ aktualni_posatky = aktualni_lod["pocet_posatky"]
 zakoupene_lodi = {"basic_lod": True}
 
 
+def get_cilova_crew_pro_lod(nazev_lodi):
+    if nazev_lodi == "basic_lod":
+        return 5
+    if nazev_lodi == "advanced_ship":
+        return 10
+    if nazev_lodi == "professional_ship":
+        return 15
+    return 5
+
+
+def get_rozsah_crew_pro_lod(nazev_lodi):
+    cilova_crew = get_cilova_crew_pro_lod(nazev_lodi)
+    max_crew = 0
+    if nazev_lodi == "basic_lod":
+        max_crew = 5
+    elif nazev_lodi == "advanced_ship":
+        max_crew = 10
+    elif nazev_lodi == "professional_ship":
+        max_crew = 15
+    limit = max(1, max_crew - 1)
+    return max(1, cilova_crew - 1), limit
+
+
+def vygeneruj_crew_pro_lod(nazev_lodi):
+    crew_min, crew_max = get_rozsah_crew_pro_lod(nazev_lodi)
+    return random.randint(crew_min, crew_max)
+
+
+def synchronizuj_ostrovy_podle_lodi():
+    crew_min, crew_max = get_rozsah_crew_pro_lod(aktualni_lod["nazev"])
+    for ostrov in ostrov_spawn:
+        if ostrov.get("dobyt", False):
+            continue
+        crew = random.randint(crew_min, crew_max)
+        ostrov["posatky"] = crew
+        ostrov["puvodni_posatky"] = crew
+        ostrov["odmena"] = crew * 250
+
+
+def omez_zlato_na_kapacitu():
+    global aktualni_zlato
+    aktualni_zlato = min(aktualni_zlato, maximalni_unosnost_zlata)
+
+
+def pridej_zlato(hodnota):
+    global aktualni_zlato
+    aktualni_zlato = min(aktualni_zlato + hodnota, maximalni_unosnost_zlata)
+
+
+omez_zlato_na_kapacitu()
+
+
 def generate_ostrov_spawn(vyber, total_islands=12, map_w=MAPA_SIRKA, map_h=MAPA_VYSKA, min_dist=rozestup_ostrovu):
     """Generate island spawns with repeated names allowed."""
     spawn = []
@@ -159,14 +223,15 @@ def generate_ostrov_spawn(vyber, total_islands=12, map_w=MAPA_SIRKA, map_h=MAPA_
         name = random.choice(names)
         x = random.randint(-map_w, map_w)
         y = random.randint(-map_h, map_h)
-        crew = random.randint(5, 25)
+        crew = vygeneruj_crew_pro_lod(aktualni_lod["nazev"])
         if all(math.hypot(x - s["x"], y - s["y"]) >= min_dist for s in spawn):
             spawn.append({
                 "x": x,
                 "y": y,
                 "nazev": name,
                 "posatky": crew,
-                "odmena": crew * 100,
+                "puvodni_posatky": crew,
+                "odmena": crew * 250,
                 "dobyt": False,
                 "posledni_utok": 0,
             })
@@ -176,13 +241,14 @@ def generate_ostrov_spawn(vyber, total_islands=12, map_w=MAPA_SIRKA, map_h=MAPA_
         name = random.choice(names)
         x = random.randint(-map_w, map_w)
         y = random.randint(-map_h, map_h)
-        crew = random.randint(5, 25)
+        crew = vygeneruj_crew_pro_lod(aktualni_lod["nazev"])
         spawn.append({
             "x": x,
             "y": y,
             "nazev": name,
             "posatky": crew,
-            "odmena": crew * 100,
+            "puvodni_posatky": crew,
+            "odmena": crew * 250,
             "dobyt": False,
             "posledni_utok": 0,
         })
@@ -205,6 +271,14 @@ def nastav_aktualni_lod(nova_lod):
     maximalni_unosnost_zlata = nova_lod["maximalni_unosnost_zlata"]
     maximalni_pocet_posatky = nova_lod["maximalni_pocet_posatky"]
     aktualni_posatky = nova_lod["pocet_posatky"]
+    omez_zlato_na_kapacitu()
+
+
+def obnov_ostrov_po_porazce(ostrov):
+    puvodni_posatky = ostrov.get("puvodni_posatky", ostrov.get("posatky", 0))
+    ostrov["posatky"] = puvodni_posatky
+    ostrov["dobyt"] = False
+    ostrov["posledni_utok"] = 0
 
 
 def respawn_hrace():
@@ -371,28 +445,43 @@ while hra:
                 okno.blit(text_boj, (stred_x - text_boj.get_width() // 2, stred_y - vyska_elipsy // 2 - 30))
 
                 aktualni_cas = pygame.time.get_ticks()
-                if aktualni_cas - ostrov.get("posledni_utok", 0) >= boj_interval_ms:
+                if crew_count > 0 and aktualni_posatky > 0 and aktualni_cas - ostrov.get("posledni_utok", 0) >= boj_interval_ms:
                     ostrov["posledni_utok"] = aktualni_cas
 
-                    if crew_count > 0 and aktualni_posatky > 0:
-                        novy_crew_ostrova = max(0, crew_count - 1)
-                        nova_moje_posadka = max(0, aktualni_posatky - 1)
-                        ostrov["posatky"] = novy_crew_ostrova
-                        aktualni_posatky = nova_moje_posadka
+                    lod_stred_x = pozice_lode_x + velikost_lode_x / 2
+                    lod_stred_y = pozice_lode_y + velikost_lode_y / 2
+                    cil_x = ostrov["x"]
+                    cil_y = ostrov["y"]
 
-                    if aktualni_posatky <= 0:
-                        respawn_hrace()
-                        break
+                    smer_x = cil_x - lod_stred_x
+                    smer_y = cil_y - lod_stred_y
+                    delka_smeru = math.hypot(smer_x, smer_y)
+                    if delka_smeru > 0:
+                        projektil_vx = smer_x / delka_smeru * boj_projektil_rychlost
+                        projektil_vy = smer_y / delka_smeru * boj_projektil_rychlost
+                        bojove_projektily.append({
+                            "x": lod_stred_x,
+                            "y": lod_stred_y,
+                            "vx": projektil_vx,
+                            "vy": projektil_vy,
+                            "cil": "ostrov",
+                            "ostrov": ostrov,
+                        })
 
-                    if ostrov["posatky"] <= 0 and not ostrov["dobyt"]:
-                        ostrov["dobyt"] = True
-                        ostrov_dobyt = True
-                        barva_elipsy = (0, 255, 0)
-                        aktualni_zlato += ostrov.get("odmena", crew_count * 100)
-                        crew_text = font.render("Crew: 0", True, (180, 220, 180))
-                        okno.blit(crew_text, (stred_x - crew_text.get_width() // 2, stred_y - vyska_elipsy // 2 - 56))
-                        reward_text = font.render(f"+{ostrov.get('odmena', crew_count * 100)} gold", True, (255, 215, 0))
-                        okno.blit(reward_text, (stred_x - reward_text.get_width() // 2, stred_y - vyska_elipsy // 2 - 8))
+                    smer_x = lod_stred_x - cil_x
+                    smer_y = lod_stred_y - cil_y
+                    delka_smeru = math.hypot(smer_x, smer_y)
+                    if delka_smeru > 0:
+                        projektil_vx = smer_x / delka_smeru * boj_projektil_rychlost
+                        projektil_vy = smer_y / delka_smeru * boj_projektil_rychlost
+                        bojove_projektily.append({
+                            "x": cil_x,
+                            "y": cil_y,
+                            "vx": projektil_vx,
+                            "vy": projektil_vy,
+                            "cil": "lod",
+                            "ostrov": ostrov,
+                        })
 
 
         if vzdalenost < polomer_kolize + 50 and nazev == "shop_ostrov":
@@ -403,6 +492,67 @@ while hra:
             if stisknuto[pygame.K_e]:
                 hra = False
                 shop = True
+
+    nove_projektily = []
+    lod_stred_x = pozice_lode_x + velikost_lode_x / 2
+    lod_stred_y = pozice_lode_y + velikost_lode_y / 2
+    konec_boje = False
+
+    for projektil in bojove_projektily:
+        if projektil["cil"] == "lod":
+            smer_x = lod_stred_x - projektil["x"]
+            smer_y = lod_stred_y - projektil["y"]
+            delka_smeru = math.hypot(smer_x, smer_y)
+            if delka_smeru > 0:
+                projektil["vx"] = smer_x / delka_smeru * boj_projektil_rychlost
+                projektil["vy"] = smer_y / delka_smeru * boj_projektil_rychlost
+
+        projektil["x"] += projektil["vx"]
+        projektil["y"] += projektil["vy"]
+
+        if (
+            projektil["x"] < -MAPA_SIRKA - 200
+            or projektil["x"] > MAPA_SIRKA + 200
+            or projektil["y"] < -MAPA_VYSKA - 200
+            or projektil["y"] > MAPA_VYSKA + 200
+        ):
+            continue
+
+        projektil_rect = pygame.Rect(
+            int(projektil["x"] - kamera_x),
+            int(projektil["y"] - kamera_y),
+            boj_projektil_velikost,
+            boj_projektil_velikost,
+        )
+        pygame.draw.rect(okno, boj_projektil_barva, projektil_rect)
+
+        ostrov = projektil["ostrov"]
+        if projektil["cil"] == "ostrov":
+            if ostrov.get("dobyt", False):
+                continue
+            if math.hypot(projektil["x"] - ostrov["x"], projektil["y"] - ostrov["y"]) <= boj_projektil_rychlost + 10:
+                ostrov["posatky"] = max(0, ostrov.get("posatky", 0) - 1)
+                if ostrov["posatky"] <= 0 and not ostrov.get("dobyt", False):
+                    ostrov["dobyt"] = True
+                    ostrov["posledni_utok"] = 0
+                    pridej_zlato(ostrov.get("odmena", ostrov.get("puvodni_posatky", 0) * 250))
+                continue
+
+        if projektil["cil"] == "lod":
+            if math.hypot(projektil["x"] - lod_stred_x, projektil["y"] - lod_stred_y) <= 18:
+                aktualni_posatky = max(0, aktualni_posatky - 1)
+                if aktualni_posatky <= 0:
+                    obnov_ostrov_po_porazce(ostrov)
+                    respawn_hrace()
+                    bojove_projektily = []
+                    nove_projektily = []
+                    konec_boje = True
+                    break
+                continue
+
+        nove_projektily.append(projektil)
+
+    bojove_projektily = nove_projektily
 
 
     if not mapa_neotevrena_puvodni_rect.collidepoint(mys_pozice) and not mapa_otevrena:
@@ -475,6 +625,7 @@ while hra:
             nazev = ostrov["nazev"]
             data_ostrovu = next((o for o in vyber_ostrovu if o["nazev"] == nazev), None)
             if data_ostrovu:
+                ostrov_dobyt = ostrov.get("dobyt", False)
                 # Ostrovy se pohybují podle pozice lodě, hráč zůstává uprostřed mapy
                 mapa_ostrov_x = stred_mapa_x + (ostrov["x"] - pozice_lode_x) * skala_x
                 mapa_ostrov_y = stred_mapa_y + (ostrov["y"] - pozice_lode_y) * skala_y
@@ -487,6 +638,14 @@ while hra:
                 if sirka_ostrova > 0 and vyska_ostrova > 0:
                     obrazek_ostrovu_scaled = pygame.transform.scale(obrazek_ostrovu_mala, (sirka_ostrova, vyska_ostrova))
                     okno.blit(obrazek_ostrovu_scaled, (mapa_ostrov_x - sirka_ostrova // 2, mapa_ostrov_y - vyska_ostrova // 2))
+
+                    if ostrov_dobyt:
+                        fajfka_body = [
+                            (mapa_ostrov_x - 10, mapa_ostrov_y - vyska_ostrova // 2 - 6),
+                            (mapa_ostrov_x - 2, mapa_ostrov_y - vyska_ostrova // 2 + 4),
+                            (mapa_ostrov_x + 12, mapa_ostrov_y - vyska_ostrova // 2 - 12),
+                        ]
+                        pygame.draw.lines(okno, (30, 220, 70), False, fajfka_body, 4)
         
         # Vykreslení šipky hráče v centru mapy
         # Šipka ukazuje stejný směr jako loď v herním okně
@@ -569,7 +728,7 @@ while hra:
             shop_page = "crew"
 
         # Crew shop constants
-        crew_price = 150
+        crew_price = 50
 
         if shop_page == "ships":
             shop_lodi = [lod_informace[1], lod_informace[2]]
@@ -629,8 +788,10 @@ while hra:
                         aktualni_zlato -= lod["cena"]
                         zakoupene_lodi[lod["nazev"]] = True
                         nastav_aktualni_lod(lod)
+                        synchronizuj_ostrovy_podle_lodi()
                     elif zakoupene_lodi.get(lod["nazev"], False):
                         nastav_aktualni_lod(lod)
+                        synchronizuj_ostrovy_podle_lodi()
 
         else:  # crew page
             # Card for crew recruitment
